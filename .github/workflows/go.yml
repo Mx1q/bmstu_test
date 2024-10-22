@@ -26,6 +26,9 @@ jobs:
       - name: Run unit tests
         run: cd backend && make ci-unit -i
 
+      - name: Run integration tests
+        run: cd backend && make ci-integration -i
+
       - name: Add environment properties to allure results
         run: cd backend && make ci-add-env-properties
   
