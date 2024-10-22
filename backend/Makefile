@@ -20,3 +20,7 @@ ci-unit:
 ci-integration:
 	export ALLURE_OUTPUT_PATH="${GITHUB_WORKSPACE}" && \
 	go test -tags=integration ./... --race --parallel 10
+
+
+ci-add-env-properties:
+	cp environment.properties allure-results
