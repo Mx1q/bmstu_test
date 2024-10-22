@@ -30,8 +30,8 @@ jobs:
       - name: Run integration tests
         run: cd backend && make ci-integration -i
 
-      - name: Add environment properties to allure results
-        run: cd backend && make ci-add-env-properties
+      - name: Add environment properties and concat allure results
+        run: cd backend && make ci-concat-reports
   
       - name: Load test report history
         uses: actions/checkout@v3
