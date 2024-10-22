@@ -1,12 +1,18 @@
-FROM golang:1.22.2
+# BUILD STAGE
+FROM golang:1.22.2 AS builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+RUN go build -o /app/bin/main /app
 
-RUN go build -o ./server
-RUN touch ./logs.log
+# RUN STAGE
+FROM alpine:latest
 
-ENTRYPOINT [ "./server" ]
+WORKDIR /app
+
+COPY --from=builder /app/bin/main .
+
+ENTRYPOINT [ "/main" ]
