@@ -25,7 +25,7 @@ ci-integration:
 
 ci-concat-reports:
 	mkdir allure-results
-	cp unit-allure/* allure-results/
-	cp integration-allure/* allure-results/
+	cp ${GITHUB_WORKSPACE}/unit-allure/* allure-results/
+	cp ${GITHUB_WORKSPACE}/integration-allure/* allure-results/
 	#cp e2e-allure/* allure-results/
 	cp environment.properties allure-results
