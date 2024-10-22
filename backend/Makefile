@@ -24,8 +24,8 @@ ci-integration:
 	go test -tags=integration_test ./... --race --parallel 10
 
 ci-concat-reports:
-	mkdir allure-results
-	cp ${GITHUB_WORKSPACE}/unit-allure/* allure-results/
-	cp ${GITHUB_WORKSPACE}/integration-allure/* allure-results/
+	mkdir ${GITHUB_WORKSPACE}/allure-results
+	cp ${GITHUB_WORKSPACE}/unit-allure/* ${GITHUB_WORKSPACE}/allure-results/
+	cp ${GITHUB_WORKSPACE}/integration-allure/* ${GITHUB_WORKSPACE}/allure-results/
 	#cp e2e-allure/* allure-results/
-	cp environment.properties allure-results
+	cp ${GITHUB_WORKSPACE}/backend/environment.properties ${GITHUB_WORKSPACE}/allure-results
