@@ -17,17 +17,17 @@ jobs:
   
       - name: Set up Go
         uses: actions/setup-go@v4
-        working-directory: ./backend
         with:
           go-version: '1.22.2'
-  
+
+      - name: Install dependencies
+        run: cd backend && go mod tidy
+
       - name: Run unit tests
-        working-directory: ./backend
-        run: make ci-unit -i
+        run: cd backend && make ci-unit -i
 
       - name: Add environment properties to allure results
-        working-directory: ./backend
-        run: make ci-add-env-properties
+        run: cd backend && make ci-add-env-properties
   
       - name: Load test report history
         uses: actions/checkout@v3
