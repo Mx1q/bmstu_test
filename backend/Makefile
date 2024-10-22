@@ -15,10 +15,12 @@ report: test allure
 
 ci-unit:
 	export ALLURE_OUTPUT_PATH="${GITHUB_WORKSPACE}" && \
+	export ALLURE_OUTPUT_FOLDER="allure-results" && \
  	go test -tags=unit_test ./... --race --parallel 10
 
 ci-integration:
 	export ALLURE_OUTPUT_PATH="${GITHUB_WORKSPACE}" && \
+	export ALLURE_OUTPUT_FOLDER="allure-results" && \
 	go test -tags=integration_test ./... --race --parallel 10
 
 
