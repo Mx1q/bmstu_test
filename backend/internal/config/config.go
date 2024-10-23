@@ -38,7 +38,7 @@ type Jwt struct {
 
 func ReadConfig() (*Config, error) {
 	var config Config
-	viper.SetConfigFile(configPath)
+	viper.SetConfigFile("../../config.local.yaml")
 
 	err := viper.ReadInConfig()
 	if err != nil {
