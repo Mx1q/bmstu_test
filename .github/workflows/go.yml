@@ -30,6 +30,9 @@ jobs:
       - name: Run integration tests
         run: cd backend && make ci-integration -i
 
+      - name: Run end to end tests
+        run: cd backend && make ci-
+
       - name: Add environment properties and concat allure results
         run: cd backend && make ci-concat-reports
   
