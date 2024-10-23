@@ -26,7 +26,7 @@ ci-integration:
 ci-e2e:
 	export ALLURE_OUTPUT_PATH="${GITHUB_WORKSPACE}" && \
 	export ALLURE_OUTPUT_FOLDER="e2e-allure" && \
-	go test -tags=integration_test ./... --race --parallel 10
+	go test -tags=e2e_test ./... --race --parallel 10
 
 integration-tests:
 	export ALLURE_OUTPUT_PATH="/Users/maximhalitov/Desktop/IU7/bmstu_test/backend"
