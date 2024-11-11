@@ -19,12 +19,22 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.22.2'
-  
-      - name: Run unit tests
-        run: make ci-unit -i
+          cache-dependency-path: backend/go.sum
 
-      - name: Add environment properites to allure results
-        run: make ci-add-env-properties
+      - name: Install dependencies
+        run: cd backend && go mod tidy
+
+      - name: Run unit tests
+        run: cd backend && make ci-unit -i
+
+      - name: Run integration tests
+        run: cd backend && make ci-integration -i
+
+      - name: Run end to end tests
+        run: cd backend && make ci-e2e
+
+      - name: Add environment properties and concat allure results
+        run: cd backend && make ci-concat-reports
   
       - name: Load test report history
         uses: actions/checkout@v3
@@ -40,7 +50,7 @@ jobs:
         with:
           gh_pages: gh-pages
           allure_history: allure-history
-          allure_results: build/allure-results
+          allure_results: allure-results
 
       - name: Publish test report
         uses: peaceiris/actions-gh-pages@v3

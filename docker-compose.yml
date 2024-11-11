@@ -1,0 +1,32 @@
+services:
+  saladsDB:
+    image: postgres:15
+    container_name: "saladsDB"
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: salads
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    volumes:
+      - ./backend/internal/storage/postgres/initdb.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    image: ppo_backend
+    build:
+      context: backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend/internal/config/config.yaml:/app/config.yaml
+    container_name: "backend"
+    ports:
+      - '8081:8081'
+    depends_on:
+      saladsDB:
+        condition: service_healthy
+
