@@ -1,0 +1,11 @@
+scrape_configs:
+
+  - job_name: 'echo-ping'
+    scrape_interval: 1s
+    static_configs:
+      - targets: ['echo-ping:8081']
+
+  - job_name: 'chi-ping'
+    scrape_interval: 1s
+    static_configs:
+      - targets: ['chi-ping:8081']
