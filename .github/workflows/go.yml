@@ -27,12 +27,14 @@ jobs:
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
 
       - name: Launch govet
+        if: always()
         run: |
           cd backend
           go vet -vettool="$(which complexity)" --cycloover 10 --halsteadover 40 ./...
 #          if [ $? -ne 0 ]; then exit 1; fi
 
       - name: Launch golint
+        if: always()
         run: |
           cd backend
           golangci-lint run ./...
@@ -62,11 +64,12 @@ jobs:
       - name: Run end to end tests
         run: cd backend && make ci-e2e
 
+      - name: LS
+        if: always()
+        run: ls ${GITHUB_WORKSPACE}
+
       - name: Add environment properties and concat allure results
         run: cd backend && make ci-concat-reports
-
-      - name: LS
-        run: ls ${GITHUB_WORKSPACE}
 
       - name: Load test report history
         uses: actions/checkout@v3
