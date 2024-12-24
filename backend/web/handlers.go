@@ -139,7 +139,7 @@ func GetUser(app *app.App) http.HandlerFunc {
 func getIntFromPath(req *http.Request, filed string) (int, error) {
 	v := req.URL.Query().Get(filed)
 	if v == "" {
-		return 0, fmt.Errorf("%s: %w", filed, http.StatusBadRequest)
+		return 0, fmt.Errorf("%s: %d", filed, http.StatusBadRequest)
 	}
 	vInt, err := strconv.Atoi(v)
 	if err != nil {
@@ -291,60 +291,76 @@ func GetSaladsWithStatus(app *app.App) http.HandlerFunc { // FIXME
 		prompt := "получение списка салатов (по статусу)"
 		r.ParseForm()
 
-		page := r.URL.Query().Get("page")
-		if page == "" {
-			errorResponse(w, fmt.Errorf("%s: пустой номер страницы", prompt).Error(), http.StatusBadRequest)
-			return
-		}
-		pageInt, err := strconv.Atoi(page)
+		pageInt, err := getIntFromPath(r, "page")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование номера страницы к int: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
+		//page := r.URL.Query().Get("page")
+		//if page == "" {
+		//	errorResponse(w, fmt.Errorf("%s: пустой номер страницы", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//pageInt, err := strconv.Atoi(page)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование номера страницы к int: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
-		minRate := r.URL.Query().Get("minRate")
-		if minRate == "" {
-			minRate = "0.0"
-		}
-		minRateFloat, err := strconv.ParseFloat(minRate, 64)
+		minRateFloat, err := getFloat64FromPathOrZero(r, "minRate")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование минимального рейтинга к float: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
+		//minRate := r.URL.Query().Get("minRate")
+		//if minRate == "" {
+		//	minRate = "0.0"
+		//}
+		//minRateFloat, err := strconv.ParseFloat(minRate, 64)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование минимального рейтинга к float: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
-		ingredients := r.Form["ingredients"]
-		if len(ingredients[0]) == 0 {
-			ingredients = make([]string, 0)
+		ingredientUuids, err := getUuidArrFromReq(r, "ingredients")
+		if err != nil {
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+			return
 		}
-		ingredientUuids := make([]uuid.UUID, len(ingredients))
-		for i := 0; i < len(ingredients); i++ {
-			ingredientUuids[i], err = uuid.Parse(ingredients[i])
-			if err != nil {
-				errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
-				return
-			}
-		}
+		//ingredients := r.Form["ingredients"]
+		//if len(ingredients[0]) == 0 {
+		//	ingredients = make([]string, 0)
+		//}
+		//ingredientUuids := make([]uuid.UUID, len(ingredients))
+		//for i := 0; i < len(ingredients); i++ {
+		//	ingredientUuids[i], err = uuid.Parse(ingredients[i])
+		//	if err != nil {
+		//		errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//		return
+		//	}
+		//}
 
-		saladTypes := r.Form["types"]
-		if len(saladTypes[0]) == 0 {
-			saladTypes = make([]string, 0)
+		saladUuids, err := getUuidArrFromReq(r, "types")
+		if err != nil {
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+			return
 		}
-		saladUuids := make([]uuid.UUID, len(saladTypes))
-		for i := 0; i < len(saladTypes); i++ {
-			saladUuids[i], err = uuid.Parse(saladTypes[i])
-			if err != nil {
-				errorResponse(w, fmt.Errorf("%s: преобразование id типа салата к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
-				return
-			}
-		}
+		//saladTypes := r.Form["types"]
+		//if len(saladTypes[0]) == 0 {
+		//	saladTypes = make([]string, 0)
+		//}
+		//saladUuids := make([]uuid.UUID, len(saladTypes))
+		//for i := 0; i < len(saladTypes); i++ {
+		//	saladUuids[i], err = uuid.Parse(saladTypes[i])
+		//	if err != nil {
+		//		errorResponse(w, fmt.Errorf("%s: преобразование id типа салата к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//		return
+		//	}
+		//}
 
 		filter := new(dto.RecipeFilter)
 
 		status := r.URL.Query().Get("status")
-		if page == "" {
-			errorResponse(w, fmt.Errorf("%s: пустой номер статуса", prompt).Error(), http.StatusBadRequest)
-			return
-		}
 		statusInt, err := strconv.Atoi(status)
 		if err != nil {
 			errorResponse(w, fmt.Errorf("%s: преобразование номера статуса к int: %w", prompt, err).Error(), http.StatusBadRequest)
@@ -372,58 +388,92 @@ func GetSaladsWithStatus(app *app.App) http.HandlerFunc { // FIXME
 	}
 }
 
+func getUuidIdFromJWT(r *http.Request, field string) (uuid.UUID, error) {
+	v, err := getStringClaimFromJWT(r.Context(), field)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	vUuid, err := uuid.Parse(v)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return vUuid, nil
+}
+
 func GetUserSalads(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "получение списка салатов"
 		r.ParseForm()
 
-		userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		userUuid, err := getUuidIdFromJWT(r, "user")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
-			return
-		}
-		userUuid, err := uuid.Parse(userId)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
 
-		page := r.URL.Query().Get("page")
-		if page == "" {
-			errorResponse(w, fmt.Errorf("%s: пустой номер страницы", prompt).Error(), http.StatusBadRequest)
-			return
-		}
-		pageInt, err := strconv.Atoi(page)
+		//userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//userUuid, err := uuid.Parse(userId)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
+
+		pageInt, err := getIntFromPath(r, "page")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование номера страницы к int: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
+		//page := r.URL.Query().Get("page")
+		//if page == "" {
+		//	errorResponse(w, fmt.Errorf("%s: пустой номер страницы", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//pageInt, err := strconv.Atoi(page)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование номера страницы к int: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
-		ingredients := r.Form["ingredients"]
-		if len(ingredients[0]) == 0 {
-			ingredients = make([]string, 0)
-		}
-		ingredientUuids := make([]uuid.UUID, len(ingredients))
-		for i := 0; i < len(ingredients); i++ {
-			ingredientUuids[i], err = uuid.Parse(ingredients[i])
-			if err != nil {
-				errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
-				return
-			}
-		}
+		//ingredientUuids, err := getUuidArrFromReq(r, "ingredients")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//ingredients := r.Form["ingredients"]
+		//if len(ingredients[0]) == 0 {
+		//	ingredients = make([]string, 0)
+		//}
+		//ingredientUuids := make([]uuid.UUID, len(ingredients))
+		//for i := 0; i < len(ingredients); i++ {
+		//	ingredientUuids[i], err = uuid.Parse(ingredients[i])
+		//	if err != nil {
+		//		errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//		return
+		//	}
+		//}
 
-		saladTypes := r.Form["types"]
-		if len(saladTypes[0]) == 0 {
-			saladTypes = make([]string, 0)
-		}
-		saladUuids := make([]uuid.UUID, len(saladTypes))
-		for i := 0; i < len(saladTypes); i++ {
-			saladUuids[i], err = uuid.Parse(saladTypes[i])
-			if err != nil {
-				errorResponse(w, fmt.Errorf("%s: преобразование id типа салата к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
-				return
-			}
-		}
+		//saladUuids, err := getUuidArrFromReq(r, "types")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+
+		//saladTypes := r.Form["types"]
+		//if len(saladTypes[0]) == 0 {
+		//	saladTypes = make([]string, 0)
+		//}
+		//saladUuids := make([]uuid.UUID, len(saladTypes))
+		//for i := 0; i < len(saladTypes); i++ {
+		//	saladUuids[i], err = uuid.Parse(saladTypes[i])
+		//	if err != nil {
+		//		errorResponse(w, fmt.Errorf("%s: преобразование id типа салата к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//		return
+		//	}
+		//}
 
 		salads, err := app.SaladService.GetAllByUserId(r.Context(), userUuid)
 		if err != nil {
@@ -929,16 +979,22 @@ func UpdateComment(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление комментария"
 
-		userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		userUuid, err := getUuidIdFromJWT(r, "user_id")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
-		userUuid, err := uuid.Parse(userId)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
-			return
-		}
+
+		//userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//userUuid, err := uuid.Parse(userId)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
 
 		id := chi.URLParam(r, "id")
 		if id == "" {
@@ -1061,16 +1117,21 @@ func UpdateSalad(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление салата"
 
-		userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		userUuid, err := getUuidIdFromJWT(r, "user_id")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
-		userUuid, err := uuid.Parse(userId)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
-			return
-		}
+		//userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//userUuid, err := uuid.Parse(userId)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
 
 		id := chi.URLParam(r, "id")
 		if id == "" {
@@ -1222,16 +1283,21 @@ func UpdateRecipe(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление рецепта"
 
-		userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		userUuid, err := getUuidIdFromJWT(r, "user_id")
 		if err != nil {
 			errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
 			return
 		}
-		userUuid, err := uuid.Parse(userId)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
-			return
-		}
+		//userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//userUuid, err := uuid.Parse(userId)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
 
 		userRole, err := getStringClaimFromJWT(r.Context(), "role")
 		if err != nil {
@@ -1239,7 +1305,7 @@ func UpdateRecipe(app *app.App) http.HandlerFunc {
 			return
 		}
 
-		app.Logger.Infof("UPDATING ROLE: %s", userRole)
+		//app.Logger.Infof("UPDATING ROLE: %s", userRole)
 
 		id := chi.URLParam(r, "id")
 		if id == "" {
@@ -1615,16 +1681,21 @@ func UpdateRecipeStep(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление шага рецепта"
 
-		userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		userUuid, err := getUuidIdFromJWT(r, "user_id")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
-		userUuid, err := uuid.Parse(userId)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
-			return
-		}
+		//userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//userUuid, err := uuid.Parse(userId)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
 
 		id := chi.URLParam(r, "id")
 		if id == "" {
