@@ -1311,6 +1311,34 @@ func getUserOwnRecipeAndSalad(ctx context.Context, app *app.App, recipeId uuid.U
 	return recipeDb, nil
 }
 
+func updateRecipe(r *http.Request, recipe *domain.Recipe, userRole string) (*domain.Recipe, error) {
+	var req Recipe
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		//errorResponse(w, err.Error(), http.StatusBadRequest)
+		return nil, err
+	}
+	if req.NumberOfServings != 0 {
+		recipe.NumberOfServings = req.NumberOfServings
+	}
+	if req.TimeToCook != 0 {
+		recipe.TimeToCook = req.TimeToCook
+	}
+	if req.Status != 0 {
+		if userRole == domain.DefaultRole {
+			if req.Status == dto.EditingSaladStatus ||
+				req.Status == dto.ModerationSaladStatus ||
+				req.Status == dto.StoredSaladStatus {
+				recipe.Status = req.Status
+			}
+		} else if userRole == "admin" {
+			recipe.Status = req.Status
+		}
+	}
+
+	return recipe, nil
+}
+
 func UpdateRecipe(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление рецепта"
@@ -1375,29 +1403,35 @@ func UpdateRecipe(app *app.App) http.HandlerFunc {
 		//	return
 		//}
 
-		var req Recipe
-		err = json.NewDecoder(r.Body).Decode(&req)
+		recipeDb, err = updateRecipe(r, recipeDb, userRole)
 		if err != nil {
-			errorResponse(w, err.Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
-		if req.NumberOfServings != 0 {
-			recipeDb.NumberOfServings = req.NumberOfServings
-		}
-		if req.TimeToCook != 0 {
-			recipeDb.TimeToCook = req.TimeToCook
-		}
-		if req.Status != 0 {
-			if userRole == domain.DefaultRole {
-				if req.Status == dto.EditingSaladStatus ||
-					req.Status == dto.ModerationSaladStatus ||
-					req.Status == dto.StoredSaladStatus {
-					recipeDb.Status = req.Status
-				}
-			} else if userRole == "admin" {
-				recipeDb.Status = req.Status
-			}
-		}
+		//
+		//var req Recipe
+		//err = json.NewDecoder(r.Body).Decode(&req)
+		//if err != nil {
+		//	errorResponse(w, err.Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//if req.NumberOfServings != 0 {
+		//	recipeDb.NumberOfServings = req.NumberOfServings
+		//}
+		//if req.TimeToCook != 0 {
+		//	recipeDb.TimeToCook = req.TimeToCook
+		//}
+		//if req.Status != 0 {
+		//	if userRole == domain.DefaultRole {
+		//		if req.Status == dto.EditingSaladStatus ||
+		//			req.Status == dto.ModerationSaladStatus ||
+		//			req.Status == dto.StoredSaladStatus {
+		//			recipeDb.Status = req.Status
+		//		}
+		//	} else if userRole == "admin" {
+		//		recipeDb.Status = req.Status
+		//	}
+		//}
 
 		err = app.RecipeService.Update(r.Context(), recipeDb)
 		if err != nil {
