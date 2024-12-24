@@ -16,17 +16,17 @@ report: test allure
 ci-unit:
 	export ALLURE_OUTPUT_PATH="${GITHUB_WORKSPACE}" && \
 	export ALLURE_OUTPUT_FOLDER="unit-allure" && \
- 	go test -tags=unit_test ./... --race --parallel 10
+ 	go test -count=1 -tags=unit_test ./... --race --parallel 10
 
 ci-integration:
 	export ALLURE_OUTPUT_PATH="${GITHUB_WORKSPACE}" && \
 	export ALLURE_OUTPUT_FOLDER="integration-allure" && \
-	go test -tags=integration_test ./... --race --parallel 10
+	go test -count=1 -tags=integration_test ./... --race --parallel 10
 
 ci-e2e:
 	export ALLURE_OUTPUT_PATH="${GITHUB_WORKSPACE}" && \
 	export ALLURE_OUTPUT_FOLDER="e2e-allure" && \
-	go test -tags=e2e_test ./... --race --parallel 10
+	go test -count=1 -tags=e2e_test ./... --race --parallel 10
 
 integration-tests:
 	export ALLURE_OUTPUT_PATH="/Users/maximhalitov/Desktop/IU7/bmstu_test/backend"

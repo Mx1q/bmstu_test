@@ -55,9 +55,6 @@ jobs:
       - name: Install dependencies
         run: cd backend && go mod tidy
 
-      - name: clean tests cache
-        run: cd backend && go clean -testcache
-
       - name: Run unit tests
         id: unit
         run: cd backend && make ci-unit -i
