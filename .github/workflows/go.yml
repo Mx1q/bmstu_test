@@ -56,12 +56,17 @@ jobs:
         run: cd backend && go mod tidy
 
       - name: Run unit tests
+        id: unit
         run: cd backend && make ci-unit -i
 
       - name: Run integration tests
+        id: integration
+        if: steps.unit.outcome == 'success'
         run: cd backend && make ci-integration -i
 
       - name: Run end to end tests
+        id: e2e
+        if: steps.integration.outcome == 'success'
         run: cd backend && make ci-e2e
 
       - name: LS
