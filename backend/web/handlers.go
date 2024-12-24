@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
@@ -1279,6 +1280,37 @@ func CreateRecipe(app *app.App) http.HandlerFunc {
 	}
 }
 
+func getUuidUrlParam(r *http.Request, name string) (uuid.UUID, error) {
+	v := chi.URLParam(r, name)
+	if v == "" {
+		return uuid.Nil, fmt.Errorf("пустой id " + name)
+	}
+	vUuid, err := uuid.Parse(v)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("%s: %w", name, err)
+	}
+	return vUuid, nil
+}
+
+func getUserOwnRecipeAndSalad(ctx context.Context, app *app.App, recipeId uuid.UUID, userId uuid.UUID) (*domain.Recipe, error) {
+	recipeDb, err := app.RecipeService.GetById(ctx, recipeId)
+	if err != nil {
+		//errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		return nil, fmt.Errorf("unable to get recipe: %w", err)
+	}
+	saladDb, err := app.SaladService.GetById(ctx, recipeDb.SaladID)
+	if err != nil {
+		//errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		return nil, fmt.Errorf("unable to get salad: %w", err)
+	}
+	if saladDb.AuthorID != userId { // TODO: mb admin can change every recipe?
+		//errorResponse(w, fmt.Errorf("%s: только автор рецепта может изменить его", prompt).Error(), http.StatusBadRequest)
+		return nil, fmt.Errorf("this is not user's own recipe")
+	}
+
+	return recipeDb, nil
+}
+
 func UpdateRecipe(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление рецепта"
@@ -1307,31 +1339,41 @@ func UpdateRecipe(app *app.App) http.HandlerFunc {
 
 		//app.Logger.Infof("UPDATING ROLE: %s", userRole)
 
-		id := chi.URLParam(r, "id")
-		if id == "" {
-			errorResponse(w, fmt.Errorf("%s: пустой id комментария", prompt).Error(), http.StatusBadRequest)
-			return
-		}
-		idUuid, err := uuid.Parse(id)
+		idUuid, err := getUuidUrlParam(r, "id")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование id комментария к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: невалидный id комментария", prompt).Error(), http.StatusBadRequest)
 			return
 		}
+		//id := chi.URLParam(r, "id")
+		//if id == "" {
+		//	errorResponse(w, fmt.Errorf("%s: пустой id комментария", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//idUuid, err := uuid.Parse(id)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование id комментария к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
-		recipeDb, err := app.RecipeService.GetById(r.Context(), idUuid)
+		recipeDb, err := getUserOwnRecipeAndSalad(r.Context(), app, idUuid, userUuid)
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
-		saladDb, err := app.SaladService.GetById(r.Context(), recipeDb.SaladID)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
-			return
-		}
-		if saladDb.AuthorID != userUuid && userRole != "admin" { // TODO: mb admin can change every recipe?
-			errorResponse(w, fmt.Errorf("%s: только автор рецепта может изменить его", prompt).Error(), http.StatusBadRequest)
-			return
-		}
+		//recipeDb, err := app.RecipeService.GetById(r.Context(), idUuid)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
+		//saladDb, err := app.SaladService.GetById(r.Context(), recipeDb.SaladID)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
+		//if saladDb.AuthorID != userUuid && userRole != "admin" { // TODO: mb admin can change every recipe?
+		//	errorResponse(w, fmt.Errorf("%s: только автор рецепта может изменить его", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
 		var req Recipe
 		err = json.NewDecoder(r.Body).Decode(&req)
@@ -1697,36 +1739,47 @@ func UpdateRecipeStep(app *app.App) http.HandlerFunc {
 		//	return
 		//}
 
-		id := chi.URLParam(r, "id")
-		if id == "" {
-			errorResponse(w, fmt.Errorf("%s: пустой id комментария", prompt).Error(), http.StatusBadRequest)
-			return
-		}
-		idUuid, err := uuid.Parse(id)
+		idUuid, err := getUuidUrlParam(r, "id")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование id комментария к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
+		//id := chi.URLParam(r, "id")
+		//if id == "" {
+		//	errorResponse(w, fmt.Errorf("%s: пустой id комментария", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//idUuid, err := uuid.Parse(id)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование id комментария к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
 		recipeStep, err := app.RecipeStepService.GetById(r.Context(), idUuid)
 		if err != nil {
 			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
 			return
 		}
-		recipeDb, err := app.RecipeService.GetById(r.Context(), recipeStep.RecipeID)
+
+		_, err = app.RecipeService.GetById(r.Context(), recipeStep.RecipeID)
 		if err != nil {
 			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
 			return
 		}
-		saladDb, err := app.SaladService.GetById(r.Context(), recipeDb.SaladID)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
-			return
-		}
-		if saladDb.AuthorID != userUuid {
-			errorResponse(w, fmt.Errorf("%s: только автор рецепта может изменять шаги", prompt).Error(), http.StatusBadRequest)
-			return
-		}
+		//recipeDb, err := app.RecipeService.GetById(r.Context(), recipeStep.RecipeID)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
+		//saladDb, err := app.SaladService.GetById(r.Context(), recipeDb.SaladID)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
+		//if saladDb.AuthorID != userUuid {
+		//	errorResponse(w, fmt.Errorf("%s: только автор рецепта может изменять шаги", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
 		var req RecipeStep
 		err = json.NewDecoder(r.Body).Decode(&req)
