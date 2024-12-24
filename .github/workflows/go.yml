@@ -39,6 +39,7 @@ jobs:
 
       - name: Launch golint
         run: |
+          cd backend
           golangci-lint run ./...
           if [ $? -ne 0 ]; then exit 1; fi
 
