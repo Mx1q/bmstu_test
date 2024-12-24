@@ -34,6 +34,7 @@ jobs:
 
       - name: Launch govet
         run: |
+          cd backend
           go vet -vettool="$(which complexity)" --cycloover 10 --halsteadover 40 ./...
           if [ $? -ne 0 ]; then exit 1; fi
 
