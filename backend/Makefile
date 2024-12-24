@@ -38,7 +38,8 @@ e2e-tests:
 
 ci-concat-reports:
 	mkdir ${GITHUB_WORKSPACE}/allure-results
-	cp ${GITHUB_WORKSPACE}/unit-allure/* ${GITHUB_WORKSPACE}/allure-results/
-	cp ${GITHUB_WORKSPACE}/integration-allure/* ${GITHUB_WORKSPACE}/allure-results/
-	cp ${GITHUB_WORKSPACE}/e2e-allure/* ${GITHUB_WORKSPACE}/allure-results/
-	cp ${GITHUB_WORKSPACE}/backend/environment.properties ${GITHUB_WORKSPACE}/allure-results
+	cd ${GITHUB_WORKSPACE}
+	cp ./unit-allure/* ./allure-results/
+	cp ./integration-allure/* ./allure-results/
+	cp ./e2e-allure/* ./allure-results/
+	cp ./backend/environment.properties ./allure-results
