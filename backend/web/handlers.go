@@ -1723,11 +1723,11 @@ func UpdateRecipeStep(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление шага рецепта"
 
-		userUuid, err := getUuidIdFromJWT(r, "user_id")
-		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
-			return
-		}
+		//userUuid, err := getUuidIdFromJWT(r, "user_id")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 		//userId, err := getStringClaimFromJWT(r.Context(), "user_id")
 		//if err != nil {
 		//	errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
