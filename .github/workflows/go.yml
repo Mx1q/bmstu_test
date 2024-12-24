@@ -45,6 +45,7 @@ jobs:
           if [ $? -ne 0 ]; then exit 1; fi
 
   tests:
+    needs: lint
     runs-on: ubuntu-latest
     steps:  
       - uses: actions/checkout@v4
@@ -69,7 +70,10 @@ jobs:
 
       - name: Add environment properties and concat allure results
         run: cd backend && make ci-concat-reports
-  
+
+      - name: LS
+        run: ls ${GITHUB_WORKSPACE}
+
       - name: Load test report history
         uses: actions/checkout@v3
         if: always()
