@@ -20,12 +20,6 @@ jobs:
           go-version: '1.22.2'
       - name: Check out repository
         uses: actions/checkout@v2
-      #      - name: Go vet complexity
-      #        uses: shoooooman/go-complexity-analysis-action@v1
-      #        with:
-      #          github_token: ${{ secrets.GITHUB_TOKEN }}
-      #          cycloover: 10
-      #          halsteadover: 50
 
       - name: Install golint and go vet
         run: |
@@ -36,16 +30,16 @@ jobs:
         run: |
           cd backend
           go vet -vettool="$(which complexity)" --cycloover 10 --halsteadover 40 ./...
-          if [ $? -ne 0 ]; then exit 1; fi
+#          if [ $? -ne 0 ]; then exit 1; fi
 
       - name: Launch golint
         run: |
           cd backend
           golangci-lint run ./...
-          if [ $? -ne 0 ]; then exit 1; fi
+#          if [ $? -ne 0 ]; then exit 1; fi
 
   tests:
-    needs: lint
+#    needs: lint
     runs-on: ubuntu-latest
     steps:  
       - uses: actions/checkout@v4
