@@ -135,64 +135,141 @@ func GetUser(app *app.App) http.HandlerFunc {
 	}
 }
 
+// TODO: in dev to decrease cyclomatic complexity
+func getIntFromPath(req *http.Request, filed string) (int, error) {
+	v := req.URL.Query().Get(filed)
+	if v == "" {
+		return 0, fmt.Errorf("%s: %w", filed, http.StatusBadRequest)
+	}
+	vInt, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", filed, err)
+	}
+
+	return vInt, nil
+}
+
+func getFloat64FromPathOrZero(req *http.Request, filed string) (float64, error) {
+	v := req.URL.Query().Get(filed)
+	if v == "" {
+		v = "0.0"
+	}
+	vFloat, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", filed, err)
+	}
+
+	return vFloat, nil
+}
+
+func getUuidArrFromReq(req *http.Request, filed string) ([]uuid.UUID, error) {
+	strs := req.Form[filed]
+	if len(strs[0]) == 0 {
+		strs = make([]string, 0)
+	}
+	strsUuids := make([]uuid.UUID, len(strs))
+	var err error
+	for i := 0; i < len(strs); i++ {
+		strsUuids[i], err = uuid.Parse(strs[i])
+		if err != nil {
+			//errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+			return nil, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", "getting array of "+filed, err)
+		}
+	}
+
+	return strsUuids, nil
+}
+
+func fillFilter(minRateFloat float64, status int, saladUuids []uuid.UUID, ingredientUuids []uuid.UUID) *dto.RecipeFilter {
+	filter := new(dto.RecipeFilter)
+
+	filter.MinRate = minRateFloat
+	filter.Status = status
+	filter.SaladTypes = saladUuids
+	filter.AvailableIngredients = ingredientUuids
+
+	return filter
+}
+
 func GetSalads(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "получение списка салатов"
 		r.ParseForm()
 
-		page := r.URL.Query().Get("page")
-		if page == "" {
-			errorResponse(w, fmt.Errorf("%s: пустой номер страницы", prompt).Error(), http.StatusBadRequest)
-			return
-		}
-		pageInt, err := strconv.Atoi(page)
+		pageInt, err := getIntFromPath(r, "page")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование номера страницы к int: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
+		//page := r.URL.Query().Get("page")
+		//if page == "" {
+		//	errorResponse(w, fmt.Errorf("%s: пустой номер страницы", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//pageInt, err := strconv.Atoi(page)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование номера страницы к int: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
-		minRate := r.URL.Query().Get("minRate")
-		if minRate == "" {
-			minRate = "0.0"
-		}
-		minRateFloat, err := strconv.ParseFloat(minRate, 64)
+		minRateFloat, err := getFloat64FromPathOrZero(r, "minRate")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование минимального рейтинга к float: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
+		//minRate := r.URL.Query().Get("minRate")
+		//if minRate == "" {
+		//	minRate = "0.0"
+		//}
+		//minRateFloat, err := strconv.ParseFloat(minRate, 64)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование минимального рейтинга к float: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
-		ingredients := r.Form["ingredients"]
-		if len(ingredients[0]) == 0 {
-			ingredients = make([]string, 0)
+		ingredientUuids, err := getUuidArrFromReq(r, "ingredients")
+		if err != nil {
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+			return
 		}
-		ingredientUuids := make([]uuid.UUID, len(ingredients))
-		for i := 0; i < len(ingredients); i++ {
-			ingredientUuids[i], err = uuid.Parse(ingredients[i])
-			if err != nil {
-				errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
-				return
-			}
-		}
+		//ingredients := r.Form["ingredients"]
+		//if len(ingredients[0]) == 0 {
+		//	ingredients = make([]string, 0)
+		//}
+		//ingredientUuids := make([]uuid.UUID, len(ingredients))
+		//for i := 0; i < len(ingredients); i++ {
+		//	ingredientUuids[i], err = uuid.Parse(ingredients[i])
+		//	if err != nil {
+		//		errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//		return
+		//	}
+		//}
 
-		saladTypes := r.Form["types"]
-		if len(saladTypes[0]) == 0 {
-			saladTypes = make([]string, 0)
+		saladUuids, err := getUuidArrFromReq(r, "types")
+		if err != nil {
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+			return
 		}
-		saladUuids := make([]uuid.UUID, len(saladTypes))
-		for i := 0; i < len(saladTypes); i++ {
-			saladUuids[i], err = uuid.Parse(saladTypes[i])
-			if err != nil {
-				errorResponse(w, fmt.Errorf("%s: преобразование id типа салата к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
-				return
-			}
-		}
+		//saladTypes := r.Form["types"]
+		//if len(saladTypes[0]) == 0 {
+		//	saladTypes = make([]string, 0)
+		//}
+		//saladUuids := make([]uuid.UUID, len(saladTypes))
+		//for i := 0; i < len(saladTypes); i++ {
+		//	saladUuids[i], err = uuid.Parse(saladTypes[i])
+		//	if err != nil {
+		//		errorResponse(w, fmt.Errorf("%s: преобразование id типа салата к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//		return
+		//	}
+		//}
 
-		filter := new(dto.RecipeFilter)
-
-		filter.MinRate = minRateFloat
-		filter.Status = dto.PublishedSaladStatus
-		filter.SaladTypes = saladUuids
-		filter.AvailableIngredients = ingredientUuids
+		filter := fillFilter(minRateFloat, dto.PublishedSaladStatus, saladUuids, ingredientUuids)
+		//filter := new(dto.RecipeFilter)
+		//
+		//filter.MinRate = minRateFloat
+		//filter.Status = dto.PublishedSaladStatus
+		//filter.SaladTypes = saladUuids
+		//filter.AvailableIngredients = ingredientUuids
 
 		salads, numPages, err := app.SaladService.GetAll(r.Context(), filter, pageInt)
 		if err != nil {
