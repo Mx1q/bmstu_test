@@ -55,6 +55,9 @@ jobs:
       - name: Install dependencies
         run: cd backend && go mod tidy
 
+      - name: clean tests cache
+        run: cd backend && go clean -testcache ./...
+
       - name: Run unit tests
         id: unit
         run: cd backend && make ci-unit -i
@@ -69,9 +72,9 @@ jobs:
         if: steps.integration.outcome == 'success'
         run: cd backend && make ci-e2e
 
-      - name: LS
-        if: always()
-        run: ls ${GITHUB_WORKSPACE}
+#      - name: LS
+#        if: always()
+#        run: ls ${GITHUB_WORKSPACE}
 
       - name: Add environment properties and concat allure results
         run: cd backend && make ci-concat-reports
