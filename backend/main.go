@@ -46,6 +46,18 @@ func main() {
 	}
 	fmt.Println("successfully connected to database!")
 
+	for i := 0; i < 10; i++ {
+		for j := 0; j < 10; j++ {
+			for k := 0; k < 10; k++ {
+				for p := 0; p < 10; p++ {
+					for o := 0; o < 10; o++ {
+						fmt.Println("Testing")
+					}
+				}
+			}
+		}
+	}
+
 	app := app2.NewApp(pool, cfg, logger)
 	mux := chi.NewRouter()
 	mux.Use(cors.Handler(cors.Options{
