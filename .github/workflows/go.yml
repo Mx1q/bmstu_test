@@ -118,9 +118,13 @@ jobs:
 #          echo $ENV > .env
 
       - name: run app
+        env:
+          TOTP_SECRET: ${{ secrets.TOTP_SECRET }}
         run: cd lab_04 && make docker-run
 
       - name: Run E2E tests
+        env:
+          TOTP_SECRET: ${{ secrets.TOTP_SECRET }}
         run: cd lab_04 && make run-e2e
 
       - name: Remove env
