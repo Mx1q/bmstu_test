@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
@@ -135,11 +136,76 @@ func GetUser(app *app.App) http.HandlerFunc {
 	}
 }
 
+// TODO: in dev to decrease cyclomatic complexity
+func getIntFromPath(req *http.Request, filed string) (int, error) {
+	v := req.URL.Query().Get(filed)
+	if v == "" {
+		return 0, fmt.Errorf("%s: %d", filed, http.StatusBadRequest)
+	}
+	vInt, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", filed, err)
+	}
+
+	return vInt, nil
+}
+
+func getFloat64FromPathOrZero(req *http.Request, filed string) (float64, error) {
+	v := req.URL.Query().Get(filed)
+	if v == "" {
+		v = "0.0"
+	}
+	vFloat, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", filed, err)
+	}
+
+	return vFloat, nil
+}
+
+func getUuidArrFromReq(req *http.Request, filed string) ([]uuid.UUID, error) {
+	strs := req.Form[filed]
+	if len(strs[0]) == 0 {
+		strs = make([]string, 0)
+	}
+	strsUuids := make([]uuid.UUID, len(strs))
+	var err error
+	for i := 0; i < len(strs); i++ {
+		strsUuids[i], err = uuid.Parse(strs[i])
+		if err != nil {
+			//errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+			return nil, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", "getting array of "+filed, err)
+		}
+	}
+
+	return strsUuids, nil
+}
+
+func fillFilter(minRateFloat float64, status int, saladUuids []uuid.UUID, ingredientUuids []uuid.UUID) *dto.RecipeFilter {
+	filter := new(dto.RecipeFilter)
+
+	filter.MinRate = minRateFloat
+	filter.Status = status
+	filter.SaladTypes = saladUuids
+	filter.AvailableIngredients = ingredientUuids
+
+	return filter
+}
+
 func GetSalads(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "получение списка салатов"
-		r.ParseForm()
+		err := r.ParseForm()
+		if err != nil {
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+			return
+		}
 
+		//pageInt, err := getIntFromPath(r, "page")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 		page := r.URL.Query().Get("page")
 		if page == "" {
 			errorResponse(w, fmt.Errorf("%s: пустой номер страницы", prompt).Error(), http.StatusBadRequest)
@@ -151,6 +217,11 @@ func GetSalads(app *app.App) http.HandlerFunc {
 			return
 		}
 
+		//minRateFloat, err := getFloat64FromPathOrZero(r, "minRate")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 		minRate := r.URL.Query().Get("minRate")
 		if minRate == "" {
 			minRate = "0.0"
@@ -161,6 +232,11 @@ func GetSalads(app *app.App) http.HandlerFunc {
 			return
 		}
 
+		//ingredientUuids, err := getUuidArrFromReq(r, "ingredients")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 		ingredients := r.Form["ingredients"]
 		if len(ingredients[0]) == 0 {
 			ingredients = make([]string, 0)
@@ -174,6 +250,11 @@ func GetSalads(app *app.App) http.HandlerFunc {
 			}
 		}
 
+		//saladUuids, err := getUuidArrFromReq(r, "types")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 		saladTypes := r.Form["types"]
 		if len(saladTypes[0]) == 0 {
 			saladTypes = make([]string, 0)
@@ -187,8 +268,8 @@ func GetSalads(app *app.App) http.HandlerFunc {
 			}
 		}
 
+		//filter := fillFilter(minRateFloat, dto.PublishedSaladStatus, saladUuids, ingredientUuids)
 		filter := new(dto.RecipeFilter)
-
 		filter.MinRate = minRateFloat
 		filter.Status = dto.PublishedSaladStatus
 		filter.SaladTypes = saladUuids
@@ -212,62 +293,82 @@ func GetSalads(app *app.App) http.HandlerFunc {
 func GetSaladsWithStatus(app *app.App) http.HandlerFunc { // FIXME
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "получение списка салатов (по статусу)"
-		r.ParseForm()
-
-		page := r.URL.Query().Get("page")
-		if page == "" {
-			errorResponse(w, fmt.Errorf("%s: пустой номер страницы", prompt).Error(), http.StatusBadRequest)
-			return
-		}
-		pageInt, err := strconv.Atoi(page)
+		err := r.ParseForm()
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование номера страницы к int: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
 
-		minRate := r.URL.Query().Get("minRate")
-		if minRate == "" {
-			minRate = "0.0"
-		}
-		minRateFloat, err := strconv.ParseFloat(minRate, 64)
+		pageInt, err := getIntFromPath(r, "page")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование минимального рейтинга к float: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
+		//page := r.URL.Query().Get("page")
+		//if page == "" {
+		//	errorResponse(w, fmt.Errorf("%s: пустой номер страницы", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//pageInt, err := strconv.Atoi(page)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование номера страницы к int: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
-		ingredients := r.Form["ingredients"]
-		if len(ingredients[0]) == 0 {
-			ingredients = make([]string, 0)
+		minRateFloat, err := getFloat64FromPathOrZero(r, "minRate")
+		if err != nil {
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+			return
 		}
-		ingredientUuids := make([]uuid.UUID, len(ingredients))
-		for i := 0; i < len(ingredients); i++ {
-			ingredientUuids[i], err = uuid.Parse(ingredients[i])
-			if err != nil {
-				errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
-				return
-			}
-		}
+		//minRate := r.URL.Query().Get("minRate")
+		//if minRate == "" {
+		//	minRate = "0.0"
+		//}
+		//minRateFloat, err := strconv.ParseFloat(minRate, 64)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование минимального рейтинга к float: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
-		saladTypes := r.Form["types"]
-		if len(saladTypes[0]) == 0 {
-			saladTypes = make([]string, 0)
+		ingredientUuids, err := getUuidArrFromReq(r, "ingredients")
+		if err != nil {
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+			return
 		}
-		saladUuids := make([]uuid.UUID, len(saladTypes))
-		for i := 0; i < len(saladTypes); i++ {
-			saladUuids[i], err = uuid.Parse(saladTypes[i])
-			if err != nil {
-				errorResponse(w, fmt.Errorf("%s: преобразование id типа салата к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
-				return
-			}
+		//ingredients := r.Form["ingredients"]
+		//if len(ingredients[0]) == 0 {
+		//	ingredients = make([]string, 0)
+		//}
+		//ingredientUuids := make([]uuid.UUID, len(ingredients))
+		//for i := 0; i < len(ingredients); i++ {
+		//	ingredientUuids[i], err = uuid.Parse(ingredients[i])
+		//	if err != nil {
+		//		errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//		return
+		//	}
+		//}
+
+		saladUuids, err := getUuidArrFromReq(r, "types")
+		if err != nil {
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+			return
 		}
+		//saladTypes := r.Form["types"]
+		//if len(saladTypes[0]) == 0 {
+		//	saladTypes = make([]string, 0)
+		//}
+		//saladUuids := make([]uuid.UUID, len(saladTypes))
+		//for i := 0; i < len(saladTypes); i++ {
+		//	saladUuids[i], err = uuid.Parse(saladTypes[i])
+		//	if err != nil {
+		//		errorResponse(w, fmt.Errorf("%s: преобразование id типа салата к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//		return
+		//	}
+		//}
 
 		filter := new(dto.RecipeFilter)
 
 		status := r.URL.Query().Get("status")
-		if page == "" {
-			errorResponse(w, fmt.Errorf("%s: пустой номер статуса", prompt).Error(), http.StatusBadRequest)
-			return
-		}
 		statusInt, err := strconv.Atoi(status)
 		if err != nil {
 			errorResponse(w, fmt.Errorf("%s: преобразование номера статуса к int: %w", prompt, err).Error(), http.StatusBadRequest)
@@ -295,10 +396,32 @@ func GetSaladsWithStatus(app *app.App) http.HandlerFunc { // FIXME
 	}
 }
 
+func getUuidIdFromJWT(r *http.Request, field string) (uuid.UUID, error) {
+	v, err := getStringClaimFromJWT(r.Context(), field)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	vUuid, err := uuid.Parse(v)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return vUuid, nil
+}
+
 func GetUserSalads(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "получение списка салатов"
-		r.ParseForm()
+		err := r.ParseForm()
+		if err != nil {
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+			return
+		}
+
+		//userUuid, err := getUuidIdFromJWT(r, "user")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
 		userId, err := getStringClaimFromJWT(r.Context(), "user_id")
 		if err != nil {
@@ -311,6 +434,11 @@ func GetUserSalads(app *app.App) http.HandlerFunc {
 			return
 		}
 
+		//pageInt, err := getIntFromPath(r, "page")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 		page := r.URL.Query().Get("page")
 		if page == "" {
 			errorResponse(w, fmt.Errorf("%s: пустой номер страницы", prompt).Error(), http.StatusBadRequest)
@@ -322,31 +450,42 @@ func GetUserSalads(app *app.App) http.HandlerFunc {
 			return
 		}
 
+		//ingredientUuids, err := getUuidArrFromReq(r, "ingredients")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 		ingredients := r.Form["ingredients"]
 		if len(ingredients[0]) == 0 {
 			ingredients = make([]string, 0)
 		}
-		ingredientUuids := make([]uuid.UUID, len(ingredients))
-		for i := 0; i < len(ingredients); i++ {
-			ingredientUuids[i], err = uuid.Parse(ingredients[i])
-			if err != nil {
-				errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
-				return
-			}
-		}
+		//ingredientUuids := make([]uuid.UUID, len(ingredients))
+		//for i := 0; i < len(ingredients); i++ {
+		//	ingredientUuids[i], err = uuid.Parse(ingredients[i])
+		//	if err != nil {
+		//		errorResponse(w, fmt.Errorf("%s: преобразование id ингредиента к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//		return
+		//	}
+		//}
+
+		//saladUuids, err := getUuidArrFromReq(r, "types")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
 		saladTypes := r.Form["types"]
 		if len(saladTypes[0]) == 0 {
 			saladTypes = make([]string, 0)
 		}
-		saladUuids := make([]uuid.UUID, len(saladTypes))
-		for i := 0; i < len(saladTypes); i++ {
-			saladUuids[i], err = uuid.Parse(saladTypes[i])
-			if err != nil {
-				errorResponse(w, fmt.Errorf("%s: преобразование id типа салата к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
-				return
-			}
-		}
+		//saladUuids := make([]uuid.UUID, len(saladTypes))
+		//for i := 0; i < len(saladTypes); i++ {
+		//	saladUuids[i], err = uuid.Parse(saladTypes[i])
+		//	if err != nil {
+		//		errorResponse(w, fmt.Errorf("%s: преобразование id типа салата к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//		return
+		//	}
+		//}
 
 		salads, err := app.SaladService.GetAllByUserId(r.Context(), userUuid)
 		if err != nil {
@@ -852,14 +991,9 @@ func UpdateComment(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление комментария"
 
-		userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		userUuid, err := getUuidIdFromJWT(r, "user_id")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
-			return
-		}
-		userUuid, err := uuid.Parse(userId)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -984,16 +1118,21 @@ func UpdateSalad(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление салата"
 
-		userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		userUuid, err := getUuidIdFromJWT(r, "user_id")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
-		userUuid, err := uuid.Parse(userId)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
-			return
-		}
+		//userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//userUuid, err := uuid.Parse(userId)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
 
 		id := chi.URLParam(r, "id")
 		if id == "" {
@@ -1141,20 +1280,84 @@ func CreateRecipe(app *app.App) http.HandlerFunc {
 	}
 }
 
+func getUuidUrlParam(r *http.Request, name string) (uuid.UUID, error) {
+	v := chi.URLParam(r, name)
+	if v == "" {
+		return uuid.Nil, fmt.Errorf("пустой id " + name)
+	}
+	vUuid, err := uuid.Parse(v)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("%s: %w", name, err)
+	}
+	return vUuid, nil
+}
+
+func getUserOwnRecipeAndSalad(ctx context.Context, app *app.App, recipeId uuid.UUID, userId uuid.UUID) (*domain.Recipe, error) {
+	recipeDb, err := app.RecipeService.GetById(ctx, recipeId)
+	if err != nil {
+		//errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		return nil, fmt.Errorf("unable to get recipe: %w", err)
+	}
+	saladDb, err := app.SaladService.GetById(ctx, recipeDb.SaladID)
+	if err != nil {
+		//errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		return nil, fmt.Errorf("unable to get salad: %w", err)
+	}
+	if saladDb.AuthorID != userId { // TODO: mb admin can change every recipe?
+		//errorResponse(w, fmt.Errorf("%s: только автор рецепта может изменить его", prompt).Error(), http.StatusBadRequest)
+		return nil, fmt.Errorf("this is not user's own recipe")
+	}
+
+	return recipeDb, nil
+}
+
+func updateRecipe(r *http.Request, recipe *domain.Recipe, userRole string) (*domain.Recipe, error) {
+	var req Recipe
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		//errorResponse(w, err.Error(), http.StatusBadRequest)
+		return nil, err
+	}
+	if req.NumberOfServings != 0 {
+		recipe.NumberOfServings = req.NumberOfServings
+	}
+	if req.TimeToCook != 0 {
+		recipe.TimeToCook = req.TimeToCook
+	}
+	if req.Status != 0 {
+		if userRole == domain.DefaultRole {
+			if req.Status == dto.EditingSaladStatus ||
+				req.Status == dto.ModerationSaladStatus ||
+				req.Status == dto.StoredSaladStatus {
+				recipe.Status = req.Status
+			}
+		} else if userRole == "admin" {
+			recipe.Status = req.Status
+		}
+	}
+
+	return recipe, nil
+}
+
 func UpdateRecipe(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление рецепта"
 
-		userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		userUuid, err := getUuidIdFromJWT(r, "user_id")
 		if err != nil {
 			errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
 			return
 		}
-		userUuid, err := uuid.Parse(userId)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
-			return
-		}
+		//userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//userUuid, err := uuid.Parse(userId)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
 
 		userRole, err := getStringClaimFromJWT(r.Context(), "role")
 		if err != nil {
@@ -1162,57 +1365,73 @@ func UpdateRecipe(app *app.App) http.HandlerFunc {
 			return
 		}
 
-		app.Logger.Infof("UPDATING ROLE: %s", userRole)
+		//app.Logger.Infof("UPDATING ROLE: %s", userRole)
 
-		id := chi.URLParam(r, "id")
-		if id == "" {
-			errorResponse(w, fmt.Errorf("%s: пустой id комментария", prompt).Error(), http.StatusBadRequest)
-			return
-		}
-		idUuid, err := uuid.Parse(id)
+		idUuid, err := getUuidUrlParam(r, "id")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование id комментария к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: невалидный id комментария", prompt).Error(), http.StatusBadRequest)
 			return
 		}
+		//id := chi.URLParam(r, "id")
+		//if id == "" {
+		//	errorResponse(w, fmt.Errorf("%s: пустой id комментария", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//idUuid, err := uuid.Parse(id)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование id комментария к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
-		recipeDb, err := app.RecipeService.GetById(r.Context(), idUuid)
+		recipeDb, err := getUserOwnRecipeAndSalad(r.Context(), app, idUuid, userUuid)
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
-		saladDb, err := app.SaladService.GetById(r.Context(), recipeDb.SaladID)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
-			return
-		}
-		if saladDb.AuthorID != userUuid && userRole != "admin" { // TODO: mb admin can change every recipe?
-			errorResponse(w, fmt.Errorf("%s: только автор рецепта может изменить его", prompt).Error(), http.StatusBadRequest)
-			return
-		}
+		//recipeDb, err := app.RecipeService.GetById(r.Context(), idUuid)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
+		//saladDb, err := app.SaladService.GetById(r.Context(), recipeDb.SaladID)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
+		//if saladDb.AuthorID != userUuid && userRole != "admin" { // TODO: mb admin can change every recipe?
+		//	errorResponse(w, fmt.Errorf("%s: только автор рецепта может изменить его", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
-		var req Recipe
-		err = json.NewDecoder(r.Body).Decode(&req)
+		recipeDb, err = updateRecipe(r, recipeDb, userRole)
 		if err != nil {
-			errorResponse(w, err.Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
-		if req.NumberOfServings != 0 {
-			recipeDb.NumberOfServings = req.NumberOfServings
-		}
-		if req.TimeToCook != 0 {
-			recipeDb.TimeToCook = req.TimeToCook
-		}
-		if req.Status != 0 {
-			if userRole == domain.DefaultRole {
-				if req.Status == dto.EditingSaladStatus ||
-					req.Status == dto.ModerationSaladStatus ||
-					req.Status == dto.StoredSaladStatus {
-					recipeDb.Status = req.Status
-				}
-			} else if userRole == "admin" {
-				recipeDb.Status = req.Status
-			}
-		}
+		//
+		//var req Recipe
+		//err = json.NewDecoder(r.Body).Decode(&req)
+		//if err != nil {
+		//	errorResponse(w, err.Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//if req.NumberOfServings != 0 {
+		//	recipeDb.NumberOfServings = req.NumberOfServings
+		//}
+		//if req.TimeToCook != 0 {
+		//	recipeDb.TimeToCook = req.TimeToCook
+		//}
+		//if req.Status != 0 {
+		//	if userRole == domain.DefaultRole {
+		//		if req.Status == dto.EditingSaladStatus ||
+		//			req.Status == dto.ModerationSaladStatus ||
+		//			req.Status == dto.StoredSaladStatus {
+		//			recipeDb.Status = req.Status
+		//		}
+		//	} else if userRole == "admin" {
+		//		recipeDb.Status = req.Status
+		//	}
+		//}
 
 		err = app.RecipeService.Update(r.Context(), recipeDb)
 		if err != nil {
@@ -1538,47 +1757,63 @@ func UpdateRecipeStep(app *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		prompt := "обновление шага рецепта"
 
-		userId, err := getStringClaimFromJWT(r.Context(), "user_id")
-		if err != nil {
-			errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
-			return
-		}
-		userUuid, err := uuid.Parse(userId)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
-			return
-		}
+		//userUuid, err := getUuidIdFromJWT(r, "user_id")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//userId, err := getStringClaimFromJWT(r.Context(), "user_id")
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("получение id авторизованного пользователя: %w", err).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//userUuid, err := uuid.Parse(userId)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("преобразование id пользователя к uuid: %w", err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
 
-		id := chi.URLParam(r, "id")
-		if id == "" {
-			errorResponse(w, fmt.Errorf("%s: пустой id комментария", prompt).Error(), http.StatusBadRequest)
-			return
-		}
-		idUuid, err := uuid.Parse(id)
+		idUuid, err := getUuidUrlParam(r, "id")
 		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: преобразование id комментария к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusBadRequest)
 			return
 		}
+		//id := chi.URLParam(r, "id")
+		//if id == "" {
+		//	errorResponse(w, fmt.Errorf("%s: пустой id комментария", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
+		//idUuid, err := uuid.Parse(id)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: преобразование id комментария к uuid: %w", prompt, err).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
 		recipeStep, err := app.RecipeStepService.GetById(r.Context(), idUuid)
 		if err != nil {
 			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
 			return
 		}
-		recipeDb, err := app.RecipeService.GetById(r.Context(), recipeStep.RecipeID)
+
+		_, err = app.RecipeService.GetById(r.Context(), recipeStep.RecipeID)
 		if err != nil {
 			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
 			return
 		}
-		saladDb, err := app.SaladService.GetById(r.Context(), recipeDb.SaladID)
-		if err != nil {
-			errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
-			return
-		}
-		if saladDb.AuthorID != userUuid {
-			errorResponse(w, fmt.Errorf("%s: только автор рецепта может изменять шаги", prompt).Error(), http.StatusBadRequest)
-			return
-		}
+		//recipeDb, err := app.RecipeService.GetById(r.Context(), recipeStep.RecipeID)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
+		//saladDb, err := app.SaladService.GetById(r.Context(), recipeDb.SaladID)
+		//if err != nil {
+		//	errorResponse(w, fmt.Errorf("%s: %w", prompt, err).Error(), http.StatusInternalServerError)
+		//	return
+		//}
+		//if saladDb.AuthorID != userUuid {
+		//	errorResponse(w, fmt.Errorf("%s: только автор рецепта может изменять шаги", prompt).Error(), http.StatusBadRequest)
+		//	return
+		//}
 
 		var req RecipeStep
 		err = json.NewDecoder(r.Body).Decode(&req)

@@ -1,0 +1,10 @@
+services:
+  auth-app:
+    container_name: auth-app
+    environment:
+      TOTP_SECRET: ${TOTP_SECRET}
+    build:
+      dockerfile: Dockerfile
+      context: .
+    ports:
+      - "8081:8081"

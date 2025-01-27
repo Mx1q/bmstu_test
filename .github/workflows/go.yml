@@ -10,11 +10,42 @@ permissions:
   contents: write
 
 jobs:
-  tests:
+  lint:
     runs-on: ubuntu-latest
-    steps:  
+    environment: test-env
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.2'
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - name: Install golint and go vet
+        run: |
+          go install github.com/rauzh/go-complexity-analysis/cmd/complexity@9a7cad4
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
+
+      - name: Launch govet
+        if: always()
+        run: |
+          cd backend
+          go vet -vettool="$(which complexity)" --cycloover 10 --halsteadover 40 ./...
+#          if [ $? -ne 0 ]; then exit 1; fi
+
+      - name: Launch golint
+        if: always()
+        run: |
+          cd backend
+          golangci-lint run ./...
+#          if [ $? -ne 0 ]; then exit 1; fi
+
+  tests:
+#    needs: lint
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
-  
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -25,17 +56,26 @@ jobs:
         run: cd backend && go mod tidy
 
       - name: Run unit tests
+        id: unit
         run: cd backend && make ci-unit -i
 
       - name: Run integration tests
+        id: integration
+        if: steps.unit.outcome == 'success'
         run: cd backend && make ci-integration -i
 
       - name: Run end to end tests
+        id: e2e
+        if: steps.integration.outcome == 'success'
         run: cd backend && make ci-e2e
+
+#      - name: LS
+#        if: always()
+#        run: ls ${GITHUB_WORKSPACE}
 
       - name: Add environment properties and concat allure results
         run: cd backend && make ci-concat-reports
-  
+
       - name: Load test report history
         uses: actions/checkout@v3
         if: always()
@@ -59,4 +99,33 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: allure-history
-      
+
+  lab_04:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23.4'
+
+#      - name: 'Create env file'
+#        shell: bash
+#        env:
+#          ENV: ${{ vars.ENV }}
+#        run: |
+#          echo $ENV > .env
+
+      - name: run app
+        env:
+          TOTP_SECRET: ${{ secrets.TOTP_SECRET }}
+        run: cd lab_04 && make docker-run
+
+      - name: Run E2E tests
+        env:
+          TOTP_SECRET: ${{ secrets.TOTP_SECRET }}
+        run: cd lab_04 && make run-e2e
+
+      - name: Remove env
+        run: cd lab_04 && make docker-rm
